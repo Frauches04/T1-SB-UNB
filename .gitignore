@@ -1,0 +1,7 @@
+
+*.o
+*.obj
+montador
+ligador
+*.LIG
+*.OBJ
