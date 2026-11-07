@@ -1,102 +1,81 @@
-#ifndef ASSEMBLER_H
-#define ASSEMBLER_H
+#pragma once
 
 #include <string>
 #include <vector>
-#include <unordered_map>
-#include <utility>
-#include <cstddef>
 
-#include "Instruction.h"
-#include "Lexer.h"
-#include "SymbolTable.h"
+#include "Diretivas.h"
+#include "Erro.h"
+#include "Fonte.h"
+#include "Instrucao.h"
+#include "TabelaSimbolos.h"
+#include "Tipos.h"
 
+// Assembler e o orquestrador: recebe um caminho de .asm, executa a
+// primeira e a segunda passagem e escreve o .OBJ numa unica linha.
+//
+// O estado interno (tabela de simbolos, buffers e tamanho do codigo)
+// e mantido como membro porque precisa sobreviver entre as passagens:
+// a segunda passagem le o que a primeira preencheu. Como o objeto e
+// de uso unico, montar() limpa tudo no inicio.
 class Assembler {
 public:
-    Assembler();
+    // O GerenciadorErros e compartilhado com o LeitorFonte e o
+    // ProcessadorDiretivas. Passar por referencia garante que todos
+    // enxergam os mesmos erros.
+    explicit Assembler(GerenciadorErros& erros);
 
-    bool assemble(const std::string& arquivoEntrada,
-                  const std::string& arquivoSaida);
+    // Ponto de entrada. Devolve true se a montagem terminou sem
+    // erros e o arquivo de saida foi escrito. Devolve false se
+    // houve qualquer erro (os erros ficam no GerenciadorErros pro
+    // chamador imprimir).
+    bool montar(const std::string& caminhoEntrada,
+                const std::string& caminhoSaida);
 
 private:
-    // ============================================================
-    // Componentes
-    // ============================================================
-    Lexer analisadorLexico;
-    SymbolTable tabelaSimbolos;
-    std::vector<Instruction> instrucoes;
+    // Primeira passagem: monta a tabela de simbolos, calcula o
+    // tamanho do codigo e do bloco de dados e detecta rotulo
+    // repetido, instrucao invalida, secao de texto ausente etc.
+    void primeiraPassagem(LeitorFonte& leitor);
 
-    // ============================================================
-    // Tabelas internas
-    // ============================================================
-    // tabelaInstrucoes: mnemônico -> {opcode, tamanho em palavras}
-    //   Ex: "ADD" -> {1, 2}, "COPY" -> {9, 3}, "STOP" -> {14, 1}
-    std::unordered_map<std::string, std::pair<int, int>> tabelaInstrucoes;
+    // Segunda passagem: resolve operandos, gera os buffers de
+    // codigo e de dados e detecta simbolo indefinido. Usa o
+    // tamanhoCodigo calculado na primeira passagem para ajustar o
+    // endereco dos labels que apontam pra dados.
+    void segundaPassagem(LeitorFonte& leitor);
 
-    // tabelaEqu: símbolos definidos via EQU (antes de qualquer seção)
-    //   Ex: "TAM" -> 10
-    std::unordered_map<std::string, int> tabelaEqu;
+    // Concatena bufferCodigo + bufferDados em uma linha so e grava
+    // no caminho de saida. Devolve false se nao conseguir abrir o
+    // arquivo.
+    bool escreverObjeto(const std::string& caminhoSaida);
 
-    // ============================================================
-    // Estado do processo de montagem
-    // ============================================================
-    int contadorPosicao = 0;
-    bool temSecaoTexto = false;
+    // Normaliza uma string pra maiusculo (so ASCII). Mesma logica
+    // usada em outros modulos, mantida local pra nao criar
+    // dependencia cruzada.
+    static std::string normalizar(const std::string& s);
 
-    // ============================================================
-    // Constantes do projeto
-    // ============================================================
-    static constexpr std::size_t TAMANHO_MAXIMO_SIMBOLO = 30;
+    // Tenta converter a string inteira em int, rejeitando sobras
+    // ("3.5", "2x"). Aceita sinal "+" e "-".
+    static bool converterInteiro(const std::string& s, int& saida);
 
-    // ============================================================
-    // Inicialização
-    // ============================================================
-    void inicializarTabelaInstrucoes();
+    GerenciadorErros& erros;
 
-    // ============================================================
-    // Passagens
-    // ============================================================
-    bool primeiraPassagem(const std::string& caminhoEntrada);
-    bool segundaPassagem(const std::string& caminhoSaida);
+    // Nao poderiam ser locais a cada chamada porque a segunda
+    // passagem depende do que a primeira preencheu.
+    TabelaInstrucoes tabela;
+    ProcessadorDiretivas diretivas;
+    TabelaSimbolos ts;
 
-    // ============================================================
-    // Processamento de diretivas especiais
-    // ============================================================
-    bool processarEqu(const std::string& rotulo,
-                      const std::string& valor,
-                      int numeroLinha);
+    // Guardados no fim da primeira passagem. Usados na segunda pra
+    // ajustar o endereco de labels de dados (data offset + tamanho
+    // do codigo) e para nada mais.
+    int tamanhoCodigo = 0;
+    int tamanhoDados = 0;
 
-    bool avaliarIf(const std::string& expressao,
-                   bool& deveIncluir,
-                   int numeroLinha) const;
-
-    // ============================================================
-    // Resolução de operandos
-    // ============================================================
-    bool resolverOperando(const std::string& operando,
-                          int& valorSaida,
-                          int numeroLinha) const;
-
-    bool resolverExpressao(const std::string& expressao,
-                           int& valorSaida,
-                           int numeroLinha) const;
-
-    // ============================================================
-    // Validação
-    // ============================================================
-    bool ehSimboloValido(const std::string& s) const;
-    bool ehNumero(const std::string& s) const;
-
-    // ============================================================
-    // Utilidades de string
-    // ============================================================
-    static std::string aparar(const std::string& s);
-    static std::string paraMaiusculo(const std::string& s);
-
-    // ============================================================
-    // Diagnóstico
-    // ============================================================
-    void imprimirErro(const std::string& mensagem, int numeroLinha) const;
+    // Saida da segunda passagem. O buffer de codigo recebe as
+    // instrucoes na ordem em que aparecem no fonte; o buffer de
+    // dados recebe CONST e SPACE na ordem em que aparecem. No
+    // arquivo final, codigo vem primeiro e dados depois,
+    // independente da ordem das secoes no fonte.
+    std::vector<std::string> bufferCodigo;
+    std::vector<std::string> bufferDados;
 };
-
-#endif // ASSEMBLER_H
