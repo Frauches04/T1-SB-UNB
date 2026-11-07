@@ -1,0 +1,24 @@
+# Montador e Ligador — Software Básico (T1)
+
+Implementação em C++ de um montador de duas passagens e de um ligador
+para a linguagem de montagem hipotética da disciplina. O montador
+traduz um arquivo `.asm` para um arquivo objeto `.OBJ` (uma linha de
+números) e gera, quando há metadados, um arquivo `.meta` com a tabela
+de símbolos públicos, os usos externos e o bitmap de relocação. O
+ligador combina de 1 a 3 arquivos `.asm`, resolve símbolos externos,
+reloca endereços internos e produz um único `.LIG` (também uma linha
+de números), que é o executável no formato da máquina hipotética.
+
+---
+
+## 1. Pré-requisitos
+
+- **Compilador C++17**: GCC 9+ (Linux/macOS) ou TDM-GCC 10+ / MinGW-w64 (Windows)
+- **`make`**: opcional; se não tiver, compile com os comandos `g++` diretos
+- **Sistema operacional**: Linux, macOS ou Windows
+
+Verificação rápida:
+
+```bash
+g++ --version
+make --version        # opcional
