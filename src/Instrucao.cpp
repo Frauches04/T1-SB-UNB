@@ -3,10 +3,7 @@
 #include <cctype>
 
 TabelaInstrucoes::TabelaInstrucoes() {
-    // Os valores vieram da tabela da maquina hipotetica vista em sala:
-    // mnemonico, opcode numerico, quantidade de operandos e tamanho em
-    // palavras. COPY ocupa 3 palavras porque carrega dois operandos alem
-    // do opcode; STOP ocupa 1 porque nao tem operando.
+    // A ordem dos valorez segue a dos slides: Opcode, quantidade de operandos, tamanho em palavras.
     instrucoes.emplace("ADD",    DadosInstrucao{1,  1, 2});
     instrucoes.emplace("SUB",    DadosInstrucao{2,  1, 2});
     instrucoes.emplace("MUL",    DadosInstrucao{3,  1, 2});
@@ -26,7 +23,7 @@ TabelaInstrucoes::TabelaInstrucoes() {
 bool TabelaInstrucoes::buscar(const std::string& nome, DadosInstrucao& saida) const {
     auto it = instrucoes.find(normalizar(nome));
     if (it == instrucoes.end()) {
-        return false;
+        return false; // Caso o mnemonico nao seja encontrado.
     }
     saida = it->second;
     return true;
@@ -40,9 +37,7 @@ std::string TabelaInstrucoes::normalizar(const std::string& nome) {
     std::string r;
     r.reserve(nome.size());
     for (char c : nome) {
-        // O cast pra unsigned char evita comportamento indefinido do
-        // toupper quando o char tem o bit de sinal ligado (caso raro, mas
-        // barato de prevenir).
+        
         r.push_back(static_cast<char>(std::toupper(static_cast<unsigned char>(c))));
     }
     return r;

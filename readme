@@ -22,3 +22,9 @@ Verificação rápida:
 ```bash
 g++ --version
 make --version        # opcional
+
+### Observação
+
+- **Se atente ao nome das variaveis da tabela**: Em um dos testes estava dando erro de forma
+- indevida pois estava escrito MULT ao inves de MUL, então tome cuidado para que esse erro não ocorra quando for testar
+- Os nomes corretos estão colocados geralmente em Diretivas e em Instrucao

@@ -5,13 +5,10 @@
 
 namespace {
 
-// Limite da especificacao para nomes de rotulo. O enunciado garante
-// que ninguem vai passar disso, mas o leitor checa para dar mensagem
-// decente caso aconteca.
+// Limite de 30 caracteres para identificadores.
 const std::size_t TAMANHO_MAX_IDENTIFICADOR = 30;
 
-// Remove espacos e tabs das duas pontas. Usada em varios pontos, por
-// isso ficou no anonimo em vez de dentro da classe.
+// Remove espacos e tabs das duas pontas.
 std::string aparar(const std::string& s) {
     std::size_t i = 0;
     std::size_t j = s.size();
@@ -24,9 +21,7 @@ std::string aparar(const std::string& s) {
     return s.substr(i, j - i);
 }
 
-// Separa a linha em texto util e comentario. O ';' marca o inicio
-// do comentario; o resto e descartado pela montagem, mas guardamos
-// por conveniencia (debug, testes).
+// Separa a linha em texto util e comentario (a partir do ';').
 void separarComentario(const std::string& linha,
                        std::string& semComentario,
                        std::string& comentario) {
@@ -40,8 +35,7 @@ void separarComentario(const std::string& linha,
     }
 }
 
-// Verifica se o nome segue a regra do enunciado: comeca com letra ou
-// underscore, depois so letra, digito ou underscore, ate 30 chars.
+// Confere se o nome segue a regra C: letra/_ inicial, depois letra/digito/_, ate 30.
 bool identificadorValido(const std::string& nome) {
     if (nome.empty() || nome.size() > TAMANHO_MAX_IDENTIFICADOR) {
         return false;
@@ -59,9 +53,7 @@ bool identificadorValido(const std::string& nome) {
     return true;
 }
 
-// Tenta extrair um rotulo no inicio do texto. O rotulo e a parte antes
-// do primeiro ':' e precisa ser um token unico (sem espaco). Devolve
-// true e preenche 'rotulo' e 'resto' quando consegue.
+// Extrai o rotulo antes do primeiro ':' e devolve o resto da linha.
 bool extrairRotulo(const std::string& texto,
                    std::string& rotulo,
                    std::string& resto) {
@@ -73,8 +65,7 @@ bool extrairRotulo(const std::string& texto,
     if (candidato.empty()) {
         return false;
     }
-    // Se tem espaco antes dos dois-pontos, nao e rotulo, e um operando
-    // qualquer com ':' dentro (por exemplo, algo malformado).
+    // Se tem espaco antes dos dois-pontos, nao e rotulo.
     if (candidato.find_first_of(" \t") != std::string::npos) {
         return false;
     }
@@ -83,8 +74,7 @@ bool extrairRotulo(const std::string& texto,
     return true;
 }
 
-// Quebra o texto por espaco/tab, descartando tokens vazios. Nao usa
-// stringstream para deixar explicito o que consideramos separador.
+// Quebra o texto por espaco/tab, descartando tokens vazios.
 std::vector<std::string> dividirPorEspaco(const std::string& texto) {
     std::vector<std::string> tokens;
     std::string atual;
@@ -104,10 +94,7 @@ std::vector<std::string> dividirPorEspaco(const std::string& texto) {
     return tokens;
 }
 
-// Junta tokens que formam uma expressao com '+': "X", "+", "2" vira
-// "X+2". Sem isso, "ADD X + 2" seria interpretado como tres operandos,
-// quando o enunciado quer um so (endereco X mais 2). A juncao respeita
-// a ordem: sempre pega o token anterior mais o '+' mais o proximo.
+// Junta "X", "+", "2" em "X+2" para o caso ADD X + 2.
 std::vector<std::string> juntarSomas(const std::vector<std::string>& tokens) {
     std::vector<std::string> resultado;
     std::size_t i = 0;
@@ -123,8 +110,7 @@ std::vector<std::string> juntarSomas(const std::vector<std::string>& tokens) {
     return resultado;
 }
 
-// Passa para maiusculo (so ASCII). Usado para comparar nomes de secao
-// sem depender da caixa que o usuario digitou.
+// Passa para maiusculo (so ASCII).
 std::string normalizar(const std::string& s) {
     std::string r;
     r.reserve(s.size());
@@ -157,10 +143,7 @@ void LeitorFonte::reiniciar() {
     if (!arquivo.is_open() && !caminho.empty()) {
         arquivo.open(caminho);
     } else {
-        // seekg(0) volta ao inicio sem fechar o arquivo. O clear()
-        // antes e necessario porque apos getline falhar no fim do
-        // arquivo o stream fica com a flag eofbit setada, e seekg
-        // sozinho nao limpa isso.
+        // clear() limpa o eofbit antes do seekg(0).
         arquivo.clear();
         arquivo.seekg(0);
     }
@@ -199,8 +182,7 @@ bool LeitorFonte::proximaLinha(LinhaTokenizada& saida) {
     while (std::getline(arquivo, linhaBruta)) {
         ++linhaAtual;
 
-        // Tira o \r do fim caso o arquivo tenha vindo do Windows. Sem
-        // isso, o ultimo token de cada linha fica com um \r invisivel.
+        // Remove o \r de fim de linha vindo do Windows.
         if (!linhaBruta.empty() && linhaBruta.back() == '\r') {
             linhaBruta.pop_back();
         }
@@ -228,15 +210,14 @@ bool LeitorFonte::proximaLinha(LinhaTokenizada& saida) {
             continue;
         }
 
-        // Dois rotulos seguidos: o da linha anterior ficou pendente e
-        // esta linha tambem traz um. Nao ha operacao para o pendente.
+        // Dois rotulos seguidos: o pendente anterior fica sem operacao.
         if (tinhaRotulo && !rotuloPendente.empty()) {
             erros.registrar(linhaRotuloPendente, TipoErro::SINTATICO,
                             "rotulo '" + rotuloPendente + "' sem operacao");
             rotuloPendente.clear();
         }
 
-        // Se a linha nao trouxe rotulo mas havia um pendente, aplica.
+        // Aplica rotulo pendente se a linha atual nao trouxe um.
         if (!tinhaRotulo && !rotuloPendente.empty()) {
             rotulo = rotuloPendente;
             rotuloPendente.clear();
@@ -246,11 +227,10 @@ bool LeitorFonte::proximaLinha(LinhaTokenizada& saida) {
 
         if (resto.empty()) {
             if (tinhaRotulo) {
-                // Linha so com rotulo. Guarda para a proxima.
+                // Linha so com rotulo: guarda para a proxima.
                 rotuloPendente = rotulo;
                 linhaRotuloPendente = linhaAtual;
             }
-            // Se era so ":", nao faz sentido nenhum; ignora.
             continue;
         }
 
@@ -271,9 +251,7 @@ bool LeitorFonte::proximaLinha(LinhaTokenizada& saida) {
         saida.comentario = aparar(comentario);
         saida.secao = secaoAtual;
 
-        // Atualiza a secao corrente depois de preencher saida.secao.
-        // Assim a linha da SECAO fica com a secao anterior, e a troca
-        // vale a partir da linha seguinte.
+        // A troca de secao so vale para a linha seguinte.
         std::string opUpper = normalizar(saida.operacao);
         if ((opUpper == "SECAO" || opUpper == "SECTION") && !saida.operandos.empty()) {
             std::string secaoOp = normalizar(saida.operandos[0]);
@@ -287,8 +265,7 @@ bool LeitorFonte::proximaLinha(LinhaTokenizada& saida) {
         return true;
     }
 
-    // Fim do arquivo. Se sobrou rotulo pendente, foi um rotulo que
-    // ficou sem operacao; reporta e nao devolve linha.
+    // EOF: rotulo pendente sem operacao e erro.
     if (!rotuloPendente.empty()) {
         erros.registrar(linhaRotuloPendente, TipoErro::SINTATICO,
                         "rotulo '" + rotuloPendente + "' sem operacao");

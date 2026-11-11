@@ -6,16 +6,14 @@ TabelaSimbolos::TabelaSimbolos() {
 }
 
 bool TabelaSimbolos::inserir(const EntradaTS& entrada) {
-    // Copia antes de mexer pra nao alterar o objeto do chamador. O nome da
-    // copia vai normalizado pra ficar coerente com a chave do map; assim,
-    // quando alguem chamar listar(), o nome que vem junto com o valor ja
-    // esta no formato usado nas comparacoes.
+    // Esse trecho irá normalizar o nome do simbolo para maiusculo, garantindo que a busca seja case-insensitive.
     EntradaTS copia = entrada;
     copia.nome = normalizar(entrada.nome);
 
+    // Aqui e inserido o par (copia.nome, copia) na tabela de simbolos. Se já existir uma entrada com o mesmo nome, emplace não insere e retorna um par cujo segundo elemento é false. 
     auto resultado = simbolos.emplace(copia.nome, copia);
-    // emplace devolve um par<iterator, bool>. O bool e false quando ja havia
-    // uma chave igual, exatamente o caso de rotulo repetido.
+    
+    // irá retornar true se a inserção foi bem-sucedida (ou seja, não havia um símbolo com o mesmo nome) e false caso contrário.
     return resultado.second;
 }
 

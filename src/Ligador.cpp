@@ -6,18 +6,14 @@
 #include <sstream>
 
 #ifdef _WIN32
-// No Windows, std::system devolve o exit code do comando direto.
-// Nao precisamos de wait.h.
+// No Windows, std::system ja devolve o exit code.
 #else
 #include <sys/wait.h>
 #endif
 
 namespace {
 
-// Interpreta o valor devolvido por std::system. No Windows, e o
-// proprio exit code. No POSIX, precisa passar por WEXITSTATUS.
-// A checagem de WIFEXITED evita que um sinal (segfault, por
-// exemplo) seja confundido com sucesso.
+// Interpreta o retorno de std::system (exit code no Windows, WEXITSTATUS no POSIX).
 bool comandoTerminouBem(int rc) {
 #ifdef _WIN32
     return rc == 0;
@@ -33,26 +29,21 @@ Ligador::Ligador(GerenciadorErros& e) : erros(e) {
 
 bool Ligador::ligar(const std::vector<std::string>& arquivosAsm,
                     const std::string& caminhoSaida) {
-    // A especificacao fixa de 1 a 3 arquivos. Menos que 1 nao faz
-    // sentido (nada pra ligar); mais que 3 tambem nao, porque o
-    // professor quer comparar contra um gabarito de 3 modulos.
+    // A especificacao aceita de 1 a 3 arquivos.
     if (arquivosAsm.empty() || arquivosAsm.size() > 3) {
         erros.registrar(0, TipoErro::SINTATICO,
                         "o ligador aceita de 1 a 3 arquivos .asm");
         return false;
     }
 
-    // Primeiro, montar cada .asm. Se qualquer um falhar, paramos:
-    // nao adianta tentar ligar modulos incompletos.
+    // Monta cada .asm; aborta no primeiro erro.
     for (const std::string& arquivoAsm : arquivosAsm) {
         if (!montarModulo(arquivoAsm)) {
             return false;
         }
     }
 
-    // Depois de montar, ler .OBJ e .meta de cada um. Se algum
-    // arquivo nao existir (por exemplo, o montador saiu bem mas nao
-    // escreveu o .meta por bug), reportamos e paramos.
+    // Le .OBJ e .meta de cada modulo.
     std::vector<Modulo> modulos;
     modulos.reserve(arquivosAsm.size());
     for (const std::string& arquivoAsm : arquivosAsm) {
@@ -63,26 +54,16 @@ bool Ligador::ligar(const std::vector<std::string>& arquivosAsm,
         modulos.push_back(mod);
     }
 
-    // Layout: cada modulo ganha um offset cumulativo. O primeiro
-    // comeca em 0; o segundo em tamanho(modulo[0]); e assim por
-    // diante. Usamos o tamanho total do .OBJ (codigo + dados), nao
-    // so o codigo, porque o .OBJ que o montador entrega ja tem os
-    // dados no final e queremos que o proximo modulo comece depois
-    // deles.
+    // Layout: offset cumulativo por modulo (tamanho total do .OBJ).
     calcularOffsets(modulos);
 
-    // Tabela global: nome -> endereco absoluto. Construida a partir
-    // dos D de todos os .meta, somando o offset do modulo. Se
-    // aparecer o mesmo nome em dois modulos, e erro (duas
-    // definicoes do mesmo publico).
+    // Tabela global nome -> endereco absoluto.
     std::map<std::string, int> global;
     if (!construirTabelaGlobal(modulos, global)) {
         return false;
     }
 
-    // Resolucao: percorre o bitmap de relocacao de cada modulo,
-    // trocando uso externo por endereco global e ajustando os
-    // internos. O resultado concatenado e o corpo do .LIG.
+    // Resolve externos e reloca internos.
     std::vector<std::string> resultado;
     if (!resolver(modulos, global, resultado)) {
         return false;
@@ -92,9 +73,7 @@ bool Ligador::ligar(const std::vector<std::string>& arquivosAsm,
 }
 
 bool Ligador::montarModulo(const std::string& caminhoAsm) {
-    // O comando tem o caminho entre aspas pra suportar diretorios
-    // com espaco. O montador esta no diretorio atual (junto do
-    // ligador) ou no PATH; std::system procura nos dois.
+    // Aspas para suportar diretorios com espaco.
     std::string comando = "montador.exe \"" + caminhoAsm + "\"";
 
     int rc = std::system(comando.c_str());
@@ -111,9 +90,7 @@ bool Ligador::lerModulo(const std::string& caminhoAsm, Modulo& saida) {
     saida = Modulo{};
     saida.caminhoAsm = caminhoAsm;
 
-    // Ler o .OBJ (uma linha de numeros). O operador >> do ifstream
-    // separa por qualquer espaco/tab/quebra, entao o formato "uma
-    // linha com espacos" e "varias linhas" dao no mesmo.
+    // Le o .OBJ (o >> do ifstream ja separa por espaco/tab/quebra).
     std::string caminhoObj = derivarCaminho(caminhoAsm, "OBJ");
     std::ifstream arquivoObj(caminhoObj);
     if (!arquivoObj.is_open()) {
@@ -126,19 +103,12 @@ bool Ligador::lerModulo(const std::string& caminhoAsm, Modulo& saida) {
         saida.objeto.push_back(token);
     }
 
-    // Ler o .meta se existir. Se nao existir, o modulo nao tem
-    // simbolos nem relocacao - isso e valido para programa de um
-    // modulo so, sem PUBLIC/EXTERN/BEGIN, em que nenhum endereco
-    // precisa de ajuste. Nesse caso, tudo bem.
+    // Le o .meta se existir; modulo sem .meta nao tem simbolos nem relocacao.
     std::string caminhoMeta = derivarCaminho(caminhoAsm, "meta");
     std::ifstream arquivoMeta(caminhoMeta);
     if (!arquivoMeta.is_open()) {
-        // Nao e erro: modulo sem metadados.
         return true;
     }
-    // Delegamos o parse a lerMeta; aqui ja temos o stream aberto,
-    // mas pra manter a funcao simples, fechamos e chamamos de novo
-    // pelo caminho. Fica um open a mais, custo desprezivel.
     arquivoMeta.close();
     return lerMeta(caminhoMeta, saida.meta);
 }
@@ -157,8 +127,7 @@ bool Ligador::lerMeta(const std::string& caminhoMeta, MetaModulo& saida) {
         if (!linha.empty() && linha.back() == '\r') {
             linha.pop_back();
         }
-        // Pula linhas em branco (separadores que o montador pode
-        // emitir entre blocos).
+        // Pula linhas em branco.
         if (linha.empty()) {
             continue;
         }
@@ -188,9 +157,7 @@ bool Ligador::lerMeta(const std::string& caminhoMeta, MetaModulo& saida) {
                 saida.relocacao.push_back(bit);
             }
         }
-        // Linha desconhecida: ignora em vez de falhar, pra
-        // permitir que o formato do .meta evolua sem quebrar a
-        // leitura (comentarios futuros, por exemplo).
+        // Linha desconhecida: ignora para permitir evolucao do formato.
     }
     return true;
 }
@@ -212,9 +179,7 @@ bool Ligador::construirTabelaGlobal(const std::vector<Modulo>& modulos,
 
             auto it = global.find(chave);
             if (it != global.end()) {
-                // Mesmo nome publico em dois modulos: a especificacao
-                // nao preve o caso, entao tratamos como erro semantico
-                // pra o usuario perceber e corrigir.
+                // Nome publico duplicado entre modulos.
                 erros.registrar(0, TipoErro::SEMANTICO,
                                 "simbolo publico definido mais de uma vez: '" +
                                 sp.nome + "'");
@@ -230,13 +195,10 @@ bool Ligador::resolver(const std::vector<Modulo>& modulos,
                        const std::map<std::string, int>& global,
                        std::vector<std::string>& resultado) {
     for (const Modulo& mod : modulos) {
-        // Copia pra poder modificar sem sujar o original (util se
-        // um dia quisermos processar duas vezes).
+        // Copia para nao alterar o original.
         std::vector<std::string> objeto = mod.objeto;
 
-        // Indice posicao -> nome do simbolo externo. Permite, ao
-        // percorrer o bitmap, saber se uma posicao relocavel e
-        // interna (soma offset) ou externa (consulta global).
+        // Mapa posicao -> nome externo, para distinguir interno de externo.
         std::map<int, std::string> externoPorPosicao;
         for (const UsoExterno& ue : mod.meta.externos) {
             externoPorPosicao[ue.posicao] = normalizar(ue.nome);
@@ -250,6 +212,7 @@ bool Ligador::resolver(const std::vector<Modulo>& modulos,
 
             auto itExt = externoPorPosicao.find(static_cast<int>(p));
             if (itExt != externoPorPosicao.end()) {
+                // Uso externo: substitui pelo endereco global.
                 auto itGlobal = global.find(itExt->second);
                 if (itGlobal == global.end()) {
                     erros.registrar(0, TipoErro::SEMANTICO,
@@ -260,12 +223,9 @@ bool Ligador::resolver(const std::vector<Modulo>& modulos,
                 }
                 objeto[p] = std::to_string(itGlobal->second);
             } else {
+                // Endereco interno: soma offset do modulo.
                 int valorAtual = 0;
                 if (!converterInteiro(objeto[p], valorAtual)) {
-                    // Posicao marcada como relocavel mas com valor
-                    // nao-numerico. So acontece se o montador gerar
-                    // .OBJ malformado; reporta e segue (o proximo
-                    // teste vai pegar de qualquer jeito).
                     erros.registrar(0, TipoErro::SINTATICO,
                                     "valor nao numerico em posicao relocavel do modulo '" +
                                     mod.caminhoAsm + "'");
@@ -304,14 +264,10 @@ std::string Ligador::derivarCaminho(const std::string& caminho,
                                     const std::string& novaExt) {
     std::size_t pos = caminho.find_last_of('.');
     if (pos == std::string::npos) {
-        // Sem extensao: so anexa. Acontece se o usuario passar
-        // "mod1" em vez de "mod1.asm".
+        // Sem extensao: so anexa.
         return caminho + "." + novaExt;
     }
-    // O find_last_of respeita diretorios com ponto no nome
-    // ("meu.projeto/mod1.asm" corta no ponto de .asm, nao no de
-    // "meu.projeto"). O caminho completo (com diretorio) e
-    // preservado; so a extensao muda.
+    // find_last_of respeita diretorios com ponto no nome.
     return caminho.substr(0, pos) + "." + novaExt;
 }
 
