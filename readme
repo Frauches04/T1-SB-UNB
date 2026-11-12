@@ -24,9 +24,83 @@ Verificação rápida:
 ```bash
 g++ --version
 make --version        # opcional
+```
 
-### Observação
+## 2. Compilação sem `make`
 
-- **Se atente ao nome das variaveis da tabela**: Em um dos testes estava dando erro de forma
-- indevida pois estava escrito MULT ao inves de MUL, então tome cuidado para que esse erro não ocorra quando for testar
-- Os nomes corretos estão colocados geralmente em Diretivas e em Instrucao
+Na raiz do repositório, compile cada programa diretamente com o `g++`:
+
+```bash
+g++ -std=c++17 -Wall -Wextra -g -Iinclude src/main_montador.cpp src/Assembler.cpp src/Fonte.cpp src/Diretivas.cpp src/TabelaSimbolos.cpp src/Instrucao.cpp src/Erro.cpp -o montador
+g++ -std=c++17 -Wall -Wextra -g -Iinclude src/main_ligador.cpp src/Ligador.cpp src/Erro.cpp -o ligador
+```
+
+No Windows, o MinGW gera `montador.exe` e `ligador.exe`. Execute os
+programas passando os arquivos `.asm` como argumentos:
+
+```bash
+# Linux/macOS/WSL
+./montador tests/exemplo2.asm
+./ligador tests/mod1.asm tests/mod2.asm
+```
+
+```powershell
+# Windows (PowerShell)
+.\montador.exe tests\exemplo2.asm
+.\ligador.exe tests\mod1.asm tests\mod2.asm
+```
+
+O montador gera um arquivo `.OBJ` com o mesmo nome-base da entrada. O
+ligador aceita de um a três arquivos `.asm` e gera o `.LIG` com base no
+primeiro arquivo informado.
+
+## 3. Compilação e execução com `make`
+
+Se `make` estiver instalado, use os alvos disponíveis:
+
+```bash
+make                 # compila o montador e o ligador
+make run-montador    # executa o montador com tests/exemplo2.asm
+make run-ligador     # executa o ligador com tests/mod1.asm e tests/mod2.asm
+make info            # mostra as configurações de compilação
+make clean           # remove arquivos objeto e executáveis gerados
+```
+
+## 4. Executar arquivos `.OBJ` e `.LIG` no simulador
+
+Os simuladores estão em `docs/arquivosSimulador`: use `simulador` no
+Linux e `simulador.exe` no Windows. Execute os comandos a partir da raiz
+do repositório e passe como argumento o caminho do arquivo que deseja
+simular.
+
+Primeiro, gere os arquivos com o montador e o ligador, por exemplo:
+
+```bash
+make run-montador
+make run-ligador
+```
+
+Se o simulador não executar no Linux por falta de permissão, conceda
+permissão de execução com:
+
+```bash
+chmod +x docs/arquivosSimulador/simulador
+```
+
+Isso gera `tests/exemplo2.OBJ` e `tests/mod1.LIG`. Para executá-los no
+Linux:
+
+```bash
+./docs/arquivosSimulador/simulador tests/exemplo2.OBJ
+./docs/arquivosSimulador/simulador tests/mod1.LIG
+```
+
+No Windows (PowerShell):
+
+```powershell
+.\docs\arquivosSimulador\simulador.exe tests\exemplo2.OBJ
+.\docs\arquivosSimulador\simulador.exe tests\mod1.LIG
+```
+
+Substitua os caminhos pelos arquivos `.OBJ` ou `.LIG` que quiser
+executar. O simulador precisa que o arquivo informado já exista.

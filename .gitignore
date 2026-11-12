@@ -1,7 +1,9 @@
 
 *.o
 *.obj
-montador
-ligador
+/montador
+/montador.exe
+/ligador
+/ligador.exe
 *.LIG
 *.OBJ

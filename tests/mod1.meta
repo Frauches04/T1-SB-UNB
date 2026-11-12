@@ -1,0 +1,5 @@
+ENTRY 0
+D X 7
+D L2 6
+U MOD2 5
+R 0 1 0 1 0 1 0

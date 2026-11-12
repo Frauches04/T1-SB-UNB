@@ -65,8 +65,8 @@ run-montador: $(MONTADOR)
 	$(RUN_MONT) tests/exemplo2.asm
 
 run-ligador: $(LIGADOR)
-	@echo "[RUN] $(RUN_LIG) tests/p1.asm tests/p2.asm tests/p3.asm"
-	$(RUN_LIG) tests/p1.asm tests/p2.asm tests/p3.asm
+	@echo "[RUN] $(RUN_LIG) tests/mod1.asm tests/mod2.asm"
+	$(RUN_LIG) tests/mod1.asm tests/mod2.asm
 
 
 info:

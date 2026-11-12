@@ -74,13 +74,17 @@ bool Ligador::ligar(const std::vector<std::string>& arquivosAsm,
 
 bool Ligador::montarModulo(const std::string& caminhoAsm) {
     // Aspas para suportar diretorios com espaco.
+#ifdef _WIN32
     std::string comando = "montador.exe \"" + caminhoAsm + "\"";
+#else
+    std::string comando = "./montador \"" + caminhoAsm + "\"";
+#endif
 
     int rc = std::system(comando.c_str());
     if (!comandoTerminouBem(rc)) {
         erros.registrar(0, TipoErro::SINTATICO,
                         "falha ao montar '" + caminhoAsm +
-                        "' (verifique o .asm e se montador.exe esta no PATH)");
+                        "' (verifique o arquivo .asm e se o executavel montador foi compilado)");
         return false;
     }
     return true;
